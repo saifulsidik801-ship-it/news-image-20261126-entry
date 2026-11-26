@@ -346,8 +346,8 @@ ALSO = [
     ("Flipkart chief to step down", " in December. (Reuters)"),
     ("Houthis report deaths", " after Saudi strikes. (AP)"),
     ("Road crash kills 11", " in Ras Al Khaimah. (WAM)"),
-    ("Hasina seeks return to Bangladesh", "on 16 Dec. (Dhaka Tribune)"),
-    ("Davis Cup: Britain v Germany", "Zverev leads at 10:00 CET. (Davis Cup)"),
+    ("Hasina seeks return to Bangladesh", " on 16 Dec. (Dhaka Tribune)"),
+    ("Davis Cup: Britain v Germany", " Zverev leads at 10:00 CET. (Davis Cup)"),
 ]
 
 DATE_CHECK = ("DATE CHECK — These were checked and left out as not 26 Nov news: "
@@ -386,11 +386,14 @@ def draw_header(d):
         t = f"{name} {num}"
         d.text((x, 139), t, font=f, fill=col)
         x += d.textlength(t, font=f) + 22
-    # schedule strip
+    # schedule strip (auto-shrink so the last entry is never cut at the edge)
     d.rectangle([0, 158, W, 176], fill=(222, 230, 238))
+    sched = ["01:29 WIB  Labuan quake", "09:00 KST  Korail begins", "10:15 KST  Yoon ruling",
+             "15:00 CET  Chess Game 3", "18:45 CET  Europa League", "20:20 ET  Chiefs–Bills"]
+    t = "    ·    ".join(sched)
     f = F(SANS, 12)
-    t = ("01:29 WIB  Labuan quake    ·    09:00 KST  Korail begins    ·    10:15 KST  Yoon ruling    ·    "
-         "15:00 CET  Chess Game 3    ·    18:45 CET  Europa League    ·    20:20 ET  Chiefs–Bills")
+    while d.textlength(t, font=f) > W - 36 and f.size > 9:
+        f = F(SANS, f.size - 1)
     d.text((18, 162), t, font=f, fill=NAVY)
 
 
@@ -441,12 +444,24 @@ def draw_also(d, y, h):
         xx = 18 + col_i * (col_w + 4)
         cy = yy
         for bold, rest in items:
-            t = "•  " + bold + rest
-            lines = wrap(d, t, f2, col_w)
+            # normalize the bold/plain join: exactly one space between the
+            # bold lead and the plain tail (unless the tail starts with
+            # punctuation that attaches directly, like "," or ";").
+            if rest[:1] in (",", ";", " "):
+                full = bold + rest
+            else:
+                full = bold + " " + rest
+            prefix = "• " + bold
+            lines = wrap(d, "• " + full, f2, col_w)
             first = lines[0]
-            d.text((xx, cy), "•  " + bold, font=f1, fill=INK)
-            bw = d.textlength("•  " + bold, font=f1)
-            rem = first[len("•  " + bold):]
+            d.text((xx, cy), prefix, font=f1, fill=INK)
+            bw = d.textlength(prefix, font=f1)
+            rem = first[len(prefix):]
+            # safety net only: prepend a space when the tail starts with a
+            # word character (a leading space or punctuation is already
+            # correct as-is — never put a space before "," or ";").
+            if rem and rem[0].isalnum():
+                rem = " " + rem
             d.text((xx + bw, cy), rem, font=f2, fill=(40, 40, 40))
             cy += 13
             for ln in lines[1:]:
@@ -474,17 +489,27 @@ def draw_bottom(d, y, h):
                (mx + 310, my + 48)], fill=land)  # Asia
     d.polygon([(mx + 400, my + 58), (mx + 450, my + 54), (mx + 460, my + 62), (mx + 410, my + 64)],
               fill=land)  # Oceania
-    pins = [("NEW YORK", 78, 32), ("LONDON", 218, 26), ("GENEVA", 236, 34),
-            ("MUMBAI", 330, 44), ("SEOUL", 415, 32), ("TOKYO", 438, 28),
-            ("LABUAN", 385, 50), ("SYDNEY", 440, 56), ("HICKS BAY", 462, 58)]
+    # (name, px, py, label anchor): "right" (default), "left", or "below".
+    # Anchors are chosen so no two labels overlap (SEOUL/TOKYO, LABUAN/
+    # HICKS BAY/SYDNEY all collided with plain right-side labels).
+    pins = [("NEW YORK", 78, 32, "right"), ("LONDON", 218, 26, "right"),
+            ("GENEVA", 236, 34, "right"), ("MUMBAI", 330, 44, "right"),
+            ("SEOUL", 415, 32, "left"), ("TOKYO", 438, 28, "right"),
+            ("LABUAN", 385, 50, "right"), ("SYDNEY", 432, 52, "right"),
+            ("HICKS BAY", 462, 58, "below")]
     f = F(SANS_B, 9)
-    for name, px, py in pins:
+    for name, px, py, anchor in pins:
         d.ellipse([mx + px - 3, my + py - 3, mx + px + 3, my + py + 3], fill=RED)
         tw = d.textlength(name, font=f)
-        lx = mx + px + 5
-        if lx + tw > mx + mw - 4:
-            lx = mx + px - 5 - tw
-        d.text((lx, my + py - 5), name, font=f, fill=INK)
+        if anchor == "left":
+            lx, ly = mx + px - 5 - tw, my + py - 5
+        elif anchor == "below":
+            lx, ly = mx + px - 5 - tw, my + py + 8
+        else:
+            lx, ly = mx + px + 5, my + py - 5
+            if lx + tw > mx + mw - 4:
+                lx = mx + px - 5 - tw
+        d.text((lx, ly), name, font=f, fill=INK)
     d.text((mx + 8, my + mh - 26),
            "Sources: Reuters, AP, Yonhap, UEFA, EMSC, USGS, AFCA, The Times, News1, IMD.",
            font=F(SANS, 9), fill=GREY)
